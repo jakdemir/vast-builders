@@ -1,195 +1,229 @@
 {
-  "prompt": "For every segment, analyze pedestrian roadway behavior. Name any of these cases if present: (1) mid_block: crossing mid-block outside a marked crosswalk; (2) red_hand: entering/crossing on a red hand or don't-walk signal; (3) against_traffic: crossing while vehicles have green and are moving through; (4) diagonal: cutting diagonally across the intersection off crosswalk lines; (5) between_cars: stepping into moving traffic between cars away from a crosswalk. For each observed case state why in one sentence. If only a legal marked-crosswalk crossing, write legal_crosswalk. If none, write none_observed.",
+  "prompt": "For every segment, analyze pedestrian roadway behavior. Name any of these cases if present: (1) mid_block (2) red_hand (3) against_traffic (4) diagonal (5) between_cars. If only a legal marked-crosswalk crossing, write legal_crosswalk. If none, write none_observed.",
   "cases": [
     {
       "id": "red_hand",
       "title": "Against red hand / don't-walk",
+      "summary": "Pedestrians enter or continue through a marked crosswalk while the pedestrian signal shows a red hand or don't-walk.",
+      "recommended_action": "Extend pedestrian clearance (LPI + longer Walk) and add high-visibility countdown timers so walk phases match actual crossing demand.",
       "videos": [
         {
-          "original_video": "s3://team-18-vss-chunks/team-18/20261008_070412_VID_20261006_174811_003_chunk_0015.mp4",
+          "original_video": "s3://team-18-vss-chunks/team-18/20261008_070346_VID_20261006_174811_003_chunk_0014.mp4",
           "camera_id": "nyc_streets_cam-1",
           "location": "new_york",
-          "source": "s3://team-18-vss-chunks-segments/segments/20261008_070412_VID_20261006_174811_003_chunk_0015_segment_001_of_006.mp4",
-          "reasoning_content": "Pedestrians cross a marked crosswalk in front of a building with the number 401 and a storefront labeled UNIFORM. A traffic light shows a red hand for pedestrians. A white truck is parked on the right side of the street. A person in a black jacket and white shirt walks across the crosswalk, followed by another person in a light blue jacket and white pants. A person with a backpack walks from left to right. A bicycle is parked near the curb. A fire hydrant is visible on the sidewalk. A clock is mounted on the building facade. A person in a black jacket and white shirt walks across the crosswalk, followed by another person in a light blue jacket and white pants. A person with a backpack walks from left to right. A bicycle is parked near the curb. A fire hydrant is visible on the sidewalk. A clock is mounted on the building facade.",
-          "segment_start_sec": 0.0,
-          "segment_end_sec": 5.0,
-          "already_reingested": true
+          "source": "s3://team-18-vss-chunks-segments/segments/20261008_070346_VID_20261006_174811_003_chunk_0014_segment_006_of_006.mp4",
+          "reasoning_content": "Pedestrians are crossing the marked crosswalk while the pedestrian signal displays a red hand, indicating a violation of the traffic signal.",
+          "segment_start_sec": 25.0,
+          "segment_end_sec": 30.0,
+          "similarity_score": 0.48264280557632444,
+          "caption_support": "agent_yes",
+          "verified": true
         },
         {
           "original_video": "s3://team-18-vss-chunks/team-18/20261001_100624_sf3_chunk_0005.mp4",
           "camera_id": "sf_streets_cam-3",
           "location": "san_francisco",
-          "source": "s3://team-18-vss-chunks-segments/segments/20261001_100624_sf3_chunk_0005_segment_001_of_006.mp4",
-          "reasoning_content": "The scene is a city intersection with a Bank of America branch on the left and a street sign reading \"Stockton\" on the right. Pedestrians are crossing the street at a marked crosswalk, while vehicles, including a yellow taxi, are stopped or moving slowly at the intersection. The traffic light is red, indicating that vehicles must stop and pedestrians have the right of way. The overall atmosphere is calm, with no unusual behavior or safety hazards observed.",
-          "segment_start_sec": 0.0,
-          "segment_end_sec": 5.0,
-          "already_reingested": false,
-          "score": 0.3348504304885864
-        },
-        {
-          "original_video": "s3://team-18-vss-chunks/team-18/20261008_070554_VID_20261006_174811_003_chunk_0019.mp4",
-          "camera_id": "nyc_streets_cam-1",
-          "location": "new_york",
-          "source": "s3://team-18-vss-chunks-segments/segments/20261008_070554_VID_20261006_174811_003_chunk_0019_segment_002_of_006.mp4",
-          "reasoning_content": "A woman wearing a brown coat, blue jeans, and carrying a white handbag crosses the street from left to right. She walks steadily across the marked crosswalk, moving away from the camera. In the background, several pedestrians are visible on the sidewalk, some standing near a building entrance labeled \"UNIFORM\" and others walking along the street. A few people are gathered near a traffic light pole on the right side of the frame. A white truck is parked on the right side of the street, partially visible. A blue car drives through the intersection from right to left. A bicycle is parked on the sidewalk near the building entrance. A fire hydrant is visible on the left side of the frame. A clock is mounted on the building facade on the right. A traffic light is visible on the right side of the frame, showing a red hand signal. A street sign reading \"Walker St\" is visible on the left side of the frame.",
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/da5953f0b09a4401803d3f7cb22cf4c8/20261001_100624_sf3_chunk_0005_segment_002_of_006.mp4",
+          "reasoning_content": "A pedestrian is crossing the street using the marked crosswalk. The traffic light is red, and the pedestrian is crossing legally.",
           "segment_start_sec": 5.0,
           "segment_end_sec": 10.0,
-          "already_reingested": false,
-          "score": 0.3258262753486633
+          "similarity_score": 0.5201138854026794,
+          "verified": false,
+          "discovered": true
+        },
+        {
+          "original_video": "s3://team-18-vss-chunks/team-18/20261001_095126_sf2_chunk_0000.mp4",
+          "camera_id": "sf_streets_cam-2",
+          "location": "san_francisco",
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/3c03182cb4eb4ef2801722792dac2e00/20261001_095126_sf2_chunk_0000_segment_002_of_006.mp4",
+          "reasoning_content": "Legal crosswalk.",
+          "segment_start_sec": 5.0,
+          "segment_end_sec": 10.0,
+          "similarity_score": 0.43089495897293095,
+          "verified": false,
+          "discovered": true
         }
       ]
     },
     {
       "id": "against_traffic",
       "title": "Crossing while cars move on green",
+      "summary": "Pedestrians cross an intersection while vehicles have a green signal and are moving through the conflict zone.",
+      "recommended_action": "Add Leading Pedestrian Interval (LPI) and tighten turn-on-red / protected-only lefts to give walkers a head start before conflicting traffic moves.",
       "videos": [
         {
-          "original_video": "s3://team-18-vss-chunks/team-18/20261006_124051_sf5_chunk_0012.mp4",
-          "camera_id": "sf_streets_cam-5",
-          "location": "san_francisco",
-          "source": "s3://team-18-vss-chunks-segments/segments/reingest/c502473a44ca4d4e82d51204711077f3/20261006_124051_sf5_chunk_0012_segment_006_of_006.mp4",
-          "reasoning_content": "A pedestrian wearing a backpack and a white shirt is riding a green and white electric scooter across a marked crosswalk. The scooter is moving from the left side of the frame toward the right. The rider is positioned on the crosswalk, which is clearly marked with white stripes on the road surface. The pedestrian is using the crosswalk to cross the street, and there are no visible signs of illegal crossing or any other traffic violations. The traffic lights are visible in the background, and the pedestrian is crossing when the light is green for pedestrians. The pedestrian is not cutting diagonally across the intersection or stepping into moving traffic between cars. The pedestrian is not crossing mid-block outside a marked crosswalk. The pedestrian is not entering or crossing on a red hand or don't-walk signal. The pedestrian is not crossing against traffic. The pedestrian is not between cars. The pedestrian is not using a skateboard or skis. The pedestrian is not carrying a suitcase. The pedestrian is not...",
-          "segment_start_sec": 25.0,
-          "segment_end_sec": 30.0,
-          "already_reingested": true
+          "original_video": "s3://team-18-vss-chunks/team-18/20261008_070619_VID_20261006_174811_003_chunk_0020.mp4",
+          "camera_id": "nyc_streets_cam-1",
+          "location": "new_york",
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/3c30dd634a1d48d98b60ee6f9653a81f/20261008_070619_VID_20261006_174811_003_chunk_0020_segment_001_of_006.mp4",
+          "reasoning_content": "At 0:25\u20130:30 (Clip 6), pedestrians are crossing the marked crosswalk while vehicles have a green light and are moving through the same conflict area, creating a near-miss situation.",
+          "segment_start_sec": 0.0,
+          "segment_end_sec": 5.0,
+          "similarity_score": 0.45786595344543457,
+          "caption_support": "agent_yes",
+          "verified": true
         },
         {
           "original_video": "s3://team-18-vss-chunks/team-18/20261001_101553_sf4_chunk_0021.mp4",
           "camera_id": "sf_streets_cam-4",
           "location": "san_francisco",
-          "source": "s3://team-18-vss-chunks-segments/segments/20261001_101553_sf4_chunk_0021_segment_001_of_006.mp4",
-          "reasoning_content": "The scene is a wide urban intersection with multiple lanes and crosswalks. A black SUV is positioned in the center of the intersection, facing away from the camera, and appears to be waiting at a red traffic light. To the left of the SUV, a white sedan is stopped at the intersection, also facing away from the camera. On the right side of the intersection, a white truck is visible, facing the camera. Pedestrians are present on both sides of the intersection, some standing near the crosswalks and others walking along the sidewalks. The traffic lights are clearly visible, with the one facing the camera showing a red signal. The surrounding area includes various buildings, shops, and street signs, indicating a busy city environment. The overall atmosphere suggests a typical day in a bustling urban area with moderate traffic and pedestrian activity.",
-          "segment_start_sec": 0.0,
-          "segment_end_sec": 5.0,
-          "already_reingested": false,
-          "score": 0.37916111946105957
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/7071a9cb29574cb480e132a1179fd58b/20261001_101553_sf4_chunk_0021_segment_006_of_006.mp4",
+          "reasoning_content": "Pedestrians are crossing the street at a marked crosswalk. The traffic light is green for vehicles, and pedestrians are using the crosswalk to cross the street.",
+          "segment_start_sec": 25.0,
+          "segment_end_sec": 30.0,
+          "similarity_score": 0.4950374960899353,
+          "verified": false,
+          "discovered": true
         },
         {
-          "original_video": "s3://team-18-vss-chunks/team-18/20261008_064433_VID_20261006_171812_002_chunk_0000.mp4",
-          "camera_id": "nyc_streets_cam-1",
-          "location": "new_york",
-          "source": "s3://team-18-vss-chunks-segments/segments/20261008_064433_VID_20261006_171812_002_chunk_0000_segment_001_of_006.mp4",
-          "reasoning_content": "A silver SUV, a black SUV, and a white box truck are visible on the street. A person in a green striped shirt and hat stands near an orange traffic cone and a red barrier, holding an orange flag. Pedestrians cross the street, including a woman in a beige jacket and blue jeans and another in a black jacket and blue leggings. A white truck is parked on the right side of the street. A traffic light is visible, showing a red hand signal for pedestrians. A sign reading \"UNIFORM\" is visible on a building. A clock is visible on the building in the background. A fire hydrant is visible on the sidewalk. A handbag is visible on the person in the black jacket. A motorcycle is visible in the background. A person is visible walking on the sidewalk. A traffic light is visible on the right side of the street. A truck is visible on the right side of the street.",
-          "segment_start_sec": 0.0,
-          "segment_end_sec": 5.0,
-          "already_reingested": false,
-          "score": 0.37717205286026
+          "original_video": "s3://team-18-vss-chunks/team-18/20261001_095242_sf2_chunk_0003.mp4",
+          "camera_id": "sf_streets_cam-2",
+          "location": "san_francisco",
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/8eb321aa5ef940ab92480c3a23182ff6/20261001_095242_sf2_chunk_0003_segment_004_of_006.mp4",
+          "reasoning_content": "A pedestrian is crossing the street using a marked crosswalk. The pedestrian is walking from left to right across the crosswalk. The traffic light is red for vehicles, indicating that pedestrians have the right of way. The pedestrian is not cutting diagonally across the intersection or stepping into moving traffic between cars. The pedestrian is not crossing mid-block outside a marked crosswalk.",
+          "segment_start_sec": 15.0,
+          "segment_end_sec": 20.0,
+          "similarity_score": 0.4636946082115173,
+          "verified": false,
+          "discovered": true
         }
       ]
     },
     {
       "id": "diagonal",
       "title": "Diagonal cut off crosswalk lines",
+      "summary": "Pedestrians cut diagonally across an intersection, leaving the marked crosswalk lines and shortening the path through open pavement.",
+      "recommended_action": "Install scramble (Barnes Dance) phasing or corner curb extensions that make the legal two-leg path shorter and more obvious than a diagonal cut.",
       "videos": [
         {
-          "original_video": "s3://team-18-vss-chunks/team-18/20261001_101141_sf4_chunk_0011.mp4",
-          "camera_id": "sf_streets_cam-4",
+          "original_video": "s3://team-18-vss-chunks/team-18/20261001_095242_sf2_chunk_0003.mp4",
+          "camera_id": "sf_streets_cam-2",
           "location": "san_francisco",
-          "source": "s3://team-18-vss-chunks-segments/segments/reingest/b556af62956f4225ae76f7c94c250be0/20261001_101141_sf4_chunk_0011_segment_002_of_006.mp4",
-          "reasoning_content": "Pedestrians are using the marked crosswalk to cross the street. The traffic light is red for vehicles, and pedestrians are crossing legally. No one is cutting diagonally, stepping between cars, or crossing against traffic.",
-          "segment_start_sec": 5.0,
-          "segment_end_sec": 10.0,
-          "already_reingested": true
-        },
-        {
-          "original_video": "s3://team-18-vss-chunks/team-18/20261008_070346_VID_20261006_174811_003_chunk_0014.mp4",
-          "camera_id": "nyc_streets_cam-1",
-          "location": "new_york",
-          "source": "s3://team-18-vss-chunks-segments/segments/20261008_070346_VID_20261006_174811_003_chunk_0014_segment_001_of_006.mp4",
-          "reasoning_content": "The scene is a city street intersection with a marked crosswalk. Pedestrians are crossing the street from left to right, including a person in a light-colored jacket and dark pants, another in a dark top and black pants, and a person in a brown jacket and dark pants. A white truck is parked on the right side of the street near a traffic light pole. A dark-colored minivan drives through the intersection from left to right. A fire hydrant is visible on the sidewalk near the crosswalk. A street sign reading \"Walker St\" is mounted on a pole. A building with a storefront labeled \"UNIFORM\" is visible in the background. The traffic light for pedestrians is showing a red hand.",
-          "segment_start_sec": 0.0,
-          "segment_end_sec": 5.0,
-          "already_reingested": false,
-          "score": 0.47190738916397096
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/8eb321aa5ef940ab92480c3a23182ff6/20261001_095242_sf2_chunk_0003_segment_004_of_006.mp4",
+          "reasoning_content": "A pedestrian is crossing the street using a marked crosswalk. The pedestrian is walking from left to right across the crosswalk. The traffic light is red for vehicles, indicating that pedestrians have the right of way. The pedestrian is not cutting diagonally across the intersection or stepping into moving traffic between cars. The pedestrian is not crossing mid-block outside a marked crosswalk.",
+          "segment_start_sec": 15.0,
+          "segment_end_sec": 20.0,
+          "similarity_score": 0.5380085468292236,
+          "verified": false,
+          "discovered": true
         },
         {
           "original_video": "s3://team-18-vss-chunks/team-18/20261001_101412_sf4_chunk_0017.mp4",
           "camera_id": "sf_streets_cam-4",
           "location": "san_francisco",
-          "source": "s3://team-18-vss-chunks-segments/segments/20261001_101412_sf4_chunk_0017_segment_001_of_006.mp4",
-          "reasoning_content": "A man wearing a gray t-shirt, blue shorts, and gray shoes is crossing the street from left to right, carrying a brown bag in his right hand. He is walking on the crosswalk, which is marked with white stripes and a yellow line running down the center. As he moves, he passes in front of a group of people who are also crossing the street. The group consists of several individuals dressed in casual attire, including hoodies and caps, and they appear to be walking together in a coordinated manner. In the background, there are various vehicles, including cars and a bus, moving along the road. The scene takes place in an urban setting with buildings and traffic lights visible. The traffic light for the pedestrians is red, indicating that they should be stopping, but they continue to cross the street. The overall atmosphere suggests a busy city environment with people going about their daily activities.",
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/23d7423490764df1b07a85b57aeefa5e/20261001_101412_sf4_chunk_0017_segment_004_of_006.mp4",
+          "reasoning_content": "Pedestrians are using the marked crosswalk to cross the street. The traffic light is red, so vehicles are stopped. The pedestrians are crossing legally in the designated crosswalk area.",
+          "segment_start_sec": 15.0,
+          "segment_end_sec": 20.0,
+          "similarity_score": 0.4931323766708374,
+          "verified": false,
+          "discovered": true
+        },
+        {
+          "original_video": "s3://team-18-vss-chunks/team-18/20261001_101412_sf4_chunk_0017.mp4",
+          "camera_id": "sf_streets_cam-4",
+          "location": "san_francisco",
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/23d7423490764df1b07a85b57aeefa5e/20261001_101412_sf4_chunk_0017_segment_001_of_006.mp4",
+          "reasoning_content": "Pedestrians are crossing the street at a marked crosswalk. The traffic light is red, indicating that vehicles should stop and pedestrians have the right of way. The pedestrians are crossing legally and in an orderly manner. There are no instances of jaywalking, crossing against the signal, or cutting diagonally across the intersection.",
           "segment_start_sec": 0.0,
           "segment_end_sec": 5.0,
-          "already_reingested": false,
-          "score": 0.4484031915664673
+          "similarity_score": 0.4903180360794067,
+          "verified": false,
+          "discovered": true
         }
       ]
     },
     {
       "id": "mid_block",
       "title": "Mid-block outside marked crosswalk",
+      "summary": "Pedestrians cross mid-block outside a marked crosswalk, often where the nearest legal crossing feels too far.",
+      "recommended_action": "Add a midblock marked crosswalk with raised table or midblock fence/planting strip that channels desire lines to a controlled crossing.",
       "videos": [
-        {
-          "original_video": "s3://team-18-vss-chunks/team-18/20261006_124439_sf5_chunk_0021.mp4",
-          "camera_id": "sf_streets_cam-5",
-          "location": "san_francisco",
-          "source": "s3://team-18-vss-chunks-segments/segments/reingest/a7630a9db0cb43a7acf3c91d88618dd0/20261006_124439_sf5_chunk_0021_segment_002_of_006.mp4",
-          "reasoning_content": "Pedestrians are using the marked crosswalk to cross the street legally. A cyclist is riding through the intersection. Vehicles are moving through the intersection, with some turning and others proceeding straight. The traffic lights are visible and appear to be functioning normally. The scene shows a typical urban intersection with a mix of vehicles and pedestrians.",
-          "segment_start_sec": 5.0,
-          "segment_end_sec": 10.0,
-          "already_reingested": true
-        },
         {
           "original_video": "s3://team-18-vss-chunks/team-18/20261001_095126_sf2_chunk_0000.mp4",
           "camera_id": "sf_streets_cam-2",
           "location": "san_francisco",
-          "source": "s3://team-18-vss-chunks-segments/segments/20261001_095126_sf2_chunk_0000_segment_001_of_006.mp4",
-          "reasoning_content": "The scene is a busy urban intersection with pedestrians crossing in multiple directions. A white delivery truck is stopped at the intersection, partially blocking the view of the crosswalk. Several people are walking across the street, including a man in a suit who appears to be checking his phone. A person on a scooter is also visible, moving through the crosswalk. In the background, there are tall buildings with glass facades, and a traffic light is visible on the right side of the frame. The overall atmosphere suggests a typical day in a city with moderate foot traffic.",
-          "segment_start_sec": 0.0,
-          "segment_end_sec": 5.0,
-          "already_reingested": false,
-          "score": 0.45040435791015626
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/3c03182cb4eb4ef2801722792dac2e00/20261001_095126_sf2_chunk_0000_segment_002_of_006.mp4",
+          "reasoning_content": "Legal crosswalk.",
+          "segment_start_sec": 5.0,
+          "segment_end_sec": 10.0,
+          "similarity_score": 0.5205517888069153,
+          "verified": false,
+          "discovered": true
         },
         {
-          "original_video": "s3://team-18-vss-chunks/team-18/20261001_095242_sf2_chunk_0003.mp4",
-          "camera_id": "sf_streets_cam-2",
-          "location": "san_francisco",
-          "source": "s3://team-18-vss-chunks-segments/segments/20261001_095242_sf2_chunk_0003_segment_001_of_006.mp4",
-          "reasoning_content": "The scene unfolds at a busy city intersection under clear daylight, with tall modern buildings framing the view. Pedestrians are crossing the street in multiple directions, some walking briskly while others pause briefly. A woman in a black top and dark pants, carrying a blue bag, walks toward the camera, followed by a man in a black jacket and pants who is looking at his phone. Another pedestrian pushes a stroller across the crosswalk, and a person on a scooter moves through the intersection. A white SUV is parked on the left side of the frame, and a green bus is visible in the background, traveling along the street. Traffic lights and street signs are clearly visible, indicating a well-regulated urban environment. The overall atmosphere is one of routine city activity, with people and vehicles moving in an orderly manner.",
-          "segment_start_sec": 0.0,
-          "segment_end_sec": 5.0,
-          "already_reingested": false,
-          "score": 0.40599884986877444
+          "original_video": "s3://team-18-vss-chunks/team-18/20261008_070412_VID_20261006_174811_003_chunk_0015.mp4",
+          "camera_id": "nyc_streets_cam-1",
+          "location": "new_york",
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/28cfd788ca1d405d8db2d372171388cd/20261008_070412_VID_20261006_174811_003_chunk_0015_segment_003_of_006.mp4",
+          "reasoning_content": "Pedestrians are using a marked crosswalk to cross the street. The traffic light for pedestrians is showing a red hand, indicating that they should not enter the crosswalk. Vehicles are moving through the intersection while the pedestrians are waiting for the light to change. The pedestrians are not crossing the street at this time.",
+          "segment_start_sec": 10.0,
+          "segment_end_sec": 15.0,
+          "similarity_score": 0.4914064645767212,
+          "verified": false,
+          "discovered": true
+        },
+        {
+          "original_video": "s3://team-18-vss-chunks/team-18/20261008_070412_VID_20261006_174811_003_chunk_0015.mp4",
+          "camera_id": "nyc_streets_cam-1",
+          "location": "new_york",
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/28cfd788ca1d405d8db2d372171388cd/20261008_070412_VID_20261006_174811_003_chunk_0015_segment_004_of_006.mp4",
+          "reasoning_content": "Pedestrians are crossing the street using the marked crosswalk. A silver car is driving through the intersection. The traffic light for pedestrians is showing a red hand.",
+          "segment_start_sec": 15.0,
+          "segment_end_sec": 20.0,
+          "similarity_score": 0.49029563665390014,
+          "verified": false,
+          "discovered": true
         }
       ]
     },
     {
       "id": "between_cars",
       "title": "Into traffic between cars / off crosswalk",
+      "summary": "Pedestrians step into moving traffic between vehicles away from a marked crosswalk, weaving through gaps in the stream.",
+      "recommended_action": "Calm midblock speeds with turn calming / pinch points and continuous sidewalk fencing so gaps between cars are not a usable crossing path.",
       "videos": [
         {
-          "original_video": "s3://team-18-vss-chunks/team-18/20261008_070943_VID_20261006_174811_003_chunk_0028.mp4",
-          "camera_id": "nyc_streets_cam-1",
-          "location": "new_york",
-          "source": "s3://team-18-vss-chunks-segments/segments/reingest/30cad00c6b2c4b8ab69f31a05d2db7f9/20261008_070943_VID_20261006_174811_003_chunk_0028_segment_001_of_006.mp4",
-          "reasoning_content": "Pedestrians are using the marked crosswalk at the intersection. A person with a backpack and another with a handbag are crossing legally. The traffic light for vehicles is red, and the pedestrian signal shows a walking figure, indicating it is safe for pedestrians to cross. No one is crossing against the signal or in the roadway.",
-          "segment_start_sec": 0.0,
-          "segment_end_sec": 5.0,
-          "already_reingested": true
+          "original_video": "s3://team-18-vss-chunks/team-18/20261001_101141_sf4_chunk_0011.mp4",
+          "camera_id": "sf_streets_cam-4",
+          "location": "san_francisco",
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/b556af62956f4225ae76f7c94c250be0/20261001_101141_sf4_chunk_0011_segment_003_of_006.mp4",
+          "reasoning_content": "A pedestrian wearing a blue top and brown pants crosses the street using the marked crosswalk. The pedestrian is walking from left to right, moving across the intersection in a legal manner. The traffic light is red, indicating that vehicles should stop, and the pedestrian is crossing during this time. The pedestrian is not cutting diagonally across the intersection or stepping into moving traffic between cars.",
+          "segment_start_sec": 10.0,
+          "segment_end_sec": 15.0,
+          "similarity_score": 0.4207852840423584,
+          "verified": false,
+          "discovered": true
         },
         {
           "original_video": "s3://team-18-vss-chunks/team-18/20261008_070619_VID_20261006_174811_003_chunk_0020.mp4",
           "camera_id": "nyc_streets_cam-1",
           "location": "new_york",
-          "source": "s3://team-18-vss-chunks-segments/segments/20261008_070619_VID_20261006_174811_003_chunk_0020_segment_001_of_006.mp4",
-          "reasoning_content": "The scene is a busy city intersection with pedestrians crossing a marked crosswalk. A dark-colored SUV drives through the intersection from left to right. A dark sedan is parked on the right side of the frame near a building entrance. A white delivery truck is partially visible on the far right. Pedestrians are walking in various directions, some crossing the street while others are on the sidewalks. A person in a blue shirt is walking toward the camera in the foreground. A traffic light showing a red hand signal is visible on the right side of the frame. A street sign reading \"Walker St\" is visible. A building with the number \"401\" and the word \"UNIFORM\" on its facade is visible in the background. An orange traffic cone and a metal barricade are in the foreground on the left. A fire hydrant is visible on the sidewalk near the crosswalk. Several people are carrying handbags and backpacks. A bicycle is parked on the sidewalk near the building entrance.",
+          "source": "s3://team-18-vss-chunks-segments/segments/reingest/3c30dd634a1d48d98b60ee6f9653a81f/20261008_070619_VID_20261006_174811_003_chunk_0020_segment_001_of_006.mp4",
+          "reasoning_content": "Pedestrians are crossing the street at a marked crosswalk. The traffic light for pedestrians is showing a red hand, indicating that they should not be crossing. However, some pedestrians are still entering the crosswalk and beginning to cross. This is a violation of the traffic signal. The vehicles in the intersection have a green light and are moving through the intersection.",
           "segment_start_sec": 0.0,
           "segment_end_sec": 5.0,
-          "already_reingested": false,
-          "score": 0.34555003643035886
+          "similarity_score": 0.39922628402709964,
+          "verified": false,
+          "discovered": true
         },
         {
-          "original_video": "s3://team-18-vss-chunks/team-18/20261001_094358_sf1_chunk_0007.mp4",
-          "camera_id": "sf_streets_cam-1",
-          "location": "san_francisco",
-          "source": "s3://team-18-vss-chunks-segments/segments/20261001_094358_sf1_chunk_0007_segment_001_of_006.mp4",
-          "reasoning_content": "A black SUV is parked on the right side of the street, with its rear passenger door open. A woman in a pink outfit is seen exiting the vehicle and walking toward the sidewalk. Another woman, dressed in a dark outfit, is also seen getting out of the vehicle and walking toward the first woman. A man in a gray coat is standing on the sidewalk near the front of the vehicle, facing away from the camera. He appears to be observing the scene. A few other pedestrians are crossing the street in the background. The traffic light is green, allowing vehicles to move through the intersection. A few cars are seen driving through the intersection in the background. The scene takes place in an urban area with tall buildings and a busy street.",
-          "segment_start_sec": 0.0,
-          "segment_end_sec": 5.0,
-          "already_reingested": false,
-          "score": 0.2849389314651489
+          "original_video": "s3://team-18-vss-chunks/team-18/20261008_065237_VID_20261006_171812_002_chunk_0019.mp4",
+          "camera_id": "nyc_streets_cam-1",
+          "location": "new_york",
+          "source": "s3://team-18-vss-chunks-segments/segments/20261008_065237_VID_20261006_171812_002_chunk_0019_segment_002_of_006.mp4",
+          "reasoning_content": "The scene is a busy city intersection with pedestrians crossing and vehicles moving through. A white SUV with blue markings and the text \"ROAD CONTROL\" is visible, indicating it is a police vehicle. Another white SUV follows behind it. A dark gray SUV is seen driving through the intersection from left to right. A large white truck is parked on the right side of the frame.",
+          "segment_start_sec": 5.0,
+          "segment_end_sec": 10.0,
+          "similarity_score": 0.3945359349250794,
+          "verified": false,
+          "discovered": true
         }
       ]
     }
-  ]
+  ],
+  "quality": {
+    "verifier": "fill_to_three_v1",
+    "rule": "Always show up to 3 clips per case even if captions are weak matches."
+  }
 }
