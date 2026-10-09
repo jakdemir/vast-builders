@@ -1,0 +1,36 @@
+{
+  "team": "team-18",
+  "title": "Builders Catalog",
+  "subtitle": "Team projects on the shared VSS stack. Open any app below.",
+  "projects": [
+    {
+      "id": "roadplay",
+      "name": "RoadPlay",
+      "path": "/app/roadplay/",
+      "blurb": "NL-pick a road clip → pixelized video world with live YOLO movers + missions.",
+      "status": "live"
+    },
+    {
+      "id": "link-road",
+      "name": "Link Road",
+      "path": "/app/link-road/",
+      "blurb": "Road / obstruction agent — ask, ingest, and search street scenes.",
+      "status": "live"
+    },
+
+    {
+      "id": "crosswatch",
+      "name": "CrossWatch",
+      "path": "/app/crosswatch/",
+      "blurb": "Jaywalk & against-signal case board from re-ingested street cameras.",
+      "status": "live"
+    },
+    {
+      "id": "windwatch",
+      "name": "Wind Watch",
+      "path": "/app/wind",
+      "blurb": "Find archive clips with wind cues — sweep, cues, or custom query.",
+      "status": "live"
+    }
+  ]
+}

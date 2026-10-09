@@ -1,0 +1,12 @@
+.venv/
+.venv-vastdb/
+venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+*.config
+!*.config.example
+.DS_Store
+*.log
+tmp/
