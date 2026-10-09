@@ -1,0 +1,17 @@
+{
+  "name": "link-road-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "check": "node scripts/check-stack.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.5",
+    "dotenv": "^17.2.3",
+    "hono": "^4.9.9",
+    "openai": "^4.104.0",
+    "weave": "^0.16.9"
+  }
+}

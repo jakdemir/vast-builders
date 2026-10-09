@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RoadPlay — real road clip → pixel world synced to YOLO detections + gamification."""
+"""RoadPlay — real road clip → flowing cartoon pixel world + arcade gamification."""
 
 from __future__ import annotations
 
@@ -69,9 +69,9 @@ def _vss(method: str, path: str, **kwargs: Any) -> requests.Response:
 
 def _brief(caption: str) -> str:
     text = re.sub(r"\s+", " ", (caption or "").strip())
-    if len(text) > 220:
-        text = text[:217] + "..."
-    return text or "UNKNOWN ROAD. SCAN FOR MOVING TARGETS."
+    if len(text) > 200:
+        text = text[:197] + "..."
+    return text or "CHAOS STREET. CATCH THE CREW BEFORE THE CLIP ENDS!"
 
 
 def _norm_box(bbox: list[Any], shape: list[Any]) -> dict[str, float] | None:
@@ -83,24 +83,91 @@ def _norm_box(bbox: list[Any], shape: list[Any]) -> dict[str, float] | None:
     x1, y1, x2, y2 = [float(v) for v in bbox[:4]]
     cx = ((x1 + x2) * 0.5) / w
     cy = ((y1 + y2) * 0.5) / h
-    bw = max(0.02, (x2 - x1) / w)
-    bh = max(0.02, (y2 - y1) / h)
+    bw = max(0.03, (x2 - x1) / w)
+    bh = max(0.03, (y2 - y1) / h)
     return {
         "x": max(0.0, min(1.0, cx)),
         "y": max(0.0, min(1.0, cy)),
-        "w": max(0.02, min(0.45, bw)),
-        "h": max(0.02, min(0.45, bh)),
+        "w": max(0.03, min(0.4, bw)),
+        "h": max(0.03, min(0.4, bh)),
     }
 
 
-def _build_timeline(det: dict[str, Any], step_sec: float = 0.12, max_per_frame: int = 14) -> dict[str, Any]:
-    """Compress YOLO frames into a light timeline the browser can sync to video.currentTime."""
+def _missions_from_counts(counts: dict[str, Any], duration: float) -> list[dict[str, Any]]:
+    cars = int(counts.get("car") or 0) + int(counts.get("truck") or 0) + int(counts.get("bus") or 0)
+    peds = int(counts.get("person") or 0)
+    bikes = int(counts.get("bicycle") or 0) + int(counts.get("motorcycle") or 0)
+    missions = [
+        {
+            "id": "rush",
+            "label": "STREET RUSH",
+            "blurb": "Tag anything moving — fill the fever bar!",
+            "target": min(12, max(5, (cars + peds + bikes) // 2 or 5)),
+            "kind": "any",
+            "reward": 400,
+        }
+    ]
+    if cars:
+        missions.append(
+            {
+                "id": "tag_cars",
+                "label": "WHEEL GRAB",
+                "blurb": "Tag cars / trucks / buses",
+                "target": min(8, max(3, cars // 2)),
+                "kind": "car",
+                "reward": 300,
+            }
+        )
+    if peds:
+        missions.append(
+            {
+                "id": "tag_peds",
+                "label": "SIDEWALK CREW",
+                "blurb": "Tag pedestrians",
+                "target": min(7, max(2, peds // 2)),
+                "kind": "ped",
+                "reward": 300,
+            }
+        )
+    if bikes:
+        missions.append(
+            {
+                "id": "tag_bikes",
+                "label": "TWO-WHEEL ZOOM",
+                "blurb": "Tag bikes / scooters",
+                "target": min(4, max(1, bikes)),
+                "kind": "bike",
+                "reward": 250,
+            }
+        )
+    missions.append(
+        {
+            "id": "fever",
+            "label": "FEVER x5",
+            "blurb": "Hit a 5-chain combo",
+            "target": 5,
+            "kind": "combo",
+            "reward": 500,
+        }
+    )
+    missions.append(
+        {
+            "id": "survive",
+            "label": "DONT CRASH",
+            "blurb": f"Stay alive for the {duration:.0f}s clip",
+            "target": 1,
+            "kind": "survive",
+            "reward": 600,
+        }
+    )
+    return missions[:6]
+
+
+def _build_timeline(det: dict[str, Any], step_sec: float = 0.1, max_per_frame: int = 16) -> dict[str, Any]:
     frames = det.get("frames") or []
     fps = float(det.get("fps") or 30.0)
     shape = det.get("video_shape") or [1080, 1920]
-    if isinstance(shape, list) and len(shape) == 2 and all(isinstance(x, (int, float)) for x in shape):
-        pass
-    else:
+    if not (isinstance(shape, list) and len(shape) == 2):
         shape = [1080, 1920]
 
     duration = float(det.get("frame_count") or 0) / fps if fps > 0 else 0.0
@@ -128,7 +195,7 @@ def _build_timeline(det: dict[str, Any], step_sec: float = 0.12, max_per_frame: 
             if not box:
                 continue
             conf = float(d.get("confidence") or 0)
-            best_i, best_dist = -1, 0.08
+            best_i, best_dist = -1, 0.09
             for i, p in enumerate(prev_tracks):
                 if i in used_prev or p["label"] != label:
                     continue
@@ -153,16 +220,14 @@ def _build_timeline(det: dict[str, Any], step_sec: float = 0.12, max_per_frame: 
                     "h": round(box["h"], 4),
                     "playable": kind in PLAYABLE,
                     "hazard": label in HAZARD_LABELS,
+                    "star": conf > 0.75 and kind in PLAYABLE,
                 }
             )
         samples.append({"t": round(t, 3), "actors": actors})
         prev_tracks = [{"id": a["id"], "label": a["label"], "x": a["x"], "y": a["y"]} for a in actors]
         next_t = t + step_sec
 
-    counts = det.get("object_counts") or {}
-    if not isinstance(counts, dict):
-        counts = {}
-    missions = _missions_from_counts(counts)
+    counts = det.get("object_counts") if isinstance(det.get("object_counts"), dict) else {}
     return {
         "fps": fps,
         "duration": round(duration, 3),
@@ -171,29 +236,11 @@ def _build_timeline(det: dict[str, Any], step_sec: float = 0.12, max_per_frame: 
         "object_classes": det.get("object_classes") or list(counts.keys()),
         "detection_count": det.get("detection_count") or 0,
         "samples": samples,
-        "missions": missions,
+        "missions": _missions_from_counts(counts, duration),
     }
 
 
-def _missions_from_counts(counts: dict[str, Any]) -> list[dict[str, Any]]:
-    missions = []
-    cars = int(counts.get("car") or 0) + int(counts.get("truck") or 0) + int(counts.get("bus") or 0)
-    peds = int(counts.get("person") or 0)
-    bikes = int(counts.get("bicycle") or 0) + int(counts.get("motorcycle") or 0)
-    if cars:
-        missions.append({"id": "tag_cars", "label": "TAG VEHICLES", "target": min(8, max(2, cars // 2)), "kind": "car"})
-    if peds:
-        missions.append({"id": "tag_peds", "label": "TAG PEDESTRIANS", "target": min(6, max(1, peds // 2)), "kind": "ped"})
-    if bikes:
-        missions.append({"id": "tag_bikes", "label": "TAG BIKES", "target": min(3, max(1, bikes)), "kind": "bike"})
-    missions.append({"id": "survive", "label": "SURVIVE THE CLIP", "target": 1, "kind": "survive"})
-    if not any(m["id"].startswith("tag_") for m in missions):
-        missions.insert(0, {"id": "tag_any", "label": "TAG ANY TARGETS", "target": 5, "kind": "any"})
-    return missions[:4]
-
-
 def _fallback_timeline(hit: dict[str, Any]) -> dict[str, Any]:
-    """When detections missing, invent slow-moving placeholders from class counts."""
     raw = hit.get("object_classes") or ""
     classes = raw if isinstance(raw, list) else [c.strip() for c in str(raw).split(",") if c.strip()]
     counts: dict[str, int] = {}
@@ -213,22 +260,24 @@ def _fallback_timeline(hit: dict[str, Any]) -> dict[str, Any]:
                     "conf": 0.5,
                     "x": 0.15 + (j % 5) * 0.16,
                     "y": 0.35 + (i % 4) * 0.12,
-                    "w": 0.08,
-                    "h": 0.08,
+                    "w": 0.09,
+                    "h": 0.09,
                     "playable": kind in PLAYABLE,
                     "hazard": label in HAZARD_LABELS,
+                    "star": True,
                 }
             )
     samples = []
-    for step in range(40):
-        t = step * 0.15
+    for step in range(50):
+        t = step * 0.12
         actors = []
         for a in actors0:
+            drift = step * 0.01
             actors.append(
                 {
                     **a,
-                    "x": round(min(0.92, a["x"] + step * 0.008 * (1 if hash(a["id"]) % 2 else -1)), 4),
-                    "y": a["y"],
+                    "x": round(0.08 + (a["x"] + drift) % 0.84, 4),
+                    "y": round(a["y"] + 0.02 * ((step % 10) / 10), 4),
                 }
             )
         samples.append({"t": round(t, 3), "actors": actors})
@@ -240,7 +289,7 @@ def _fallback_timeline(hit: dict[str, Any]) -> dict[str, Any]:
         "object_classes": list(counts.keys()),
         "detection_count": 0,
         "samples": samples,
-        "missions": _missions_from_counts(counts),
+        "missions": _missions_from_counts(counts, 6.0),
         "fallback": True,
     }
 
@@ -323,18 +372,19 @@ def api_world():
     if not timeline:
         timeline = _fallback_timeline(meta)
 
-    world = {
-        "title": "PIXEL ROAD",
-        "brief": _brief(meta.get("reasoning_content") or hit.get("reasoning_content") or ""),
-        "source": source,
-        "camera_id": meta.get("camera_id") or hit.get("camera_id"),
-        "location": meta.get("location") or hit.get("location"),
-        "stream_path": f"api/stream?source={quote(source, safe='')}",
-        "detections_status": det_status,
-        "timeline": timeline,
-        "style": "video-to-pixel",
-    }
-    return jsonify(world)
+    return jsonify(
+        {
+            "title": "ROADPLAY",
+            "brief": _brief(meta.get("reasoning_content") or hit.get("reasoning_content") or ""),
+            "source": source,
+            "camera_id": meta.get("camera_id") or hit.get("camera_id"),
+            "location": meta.get("location") or hit.get("location"),
+            "stream_path": f"api/stream?source={quote(source, safe='')}",
+            "detections_status": det_status,
+            "timeline": timeline,
+            "style": "link-road-cartoon",
+        }
+    )
 
 
 @app.get("/api/stream")
@@ -381,77 +431,89 @@ PAGE = r"""<!DOCTYPE html>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:#1b2133;color:#1c1c24;font-family:"Press Start 2P",monospace;-webkit-font-smoothing:none}
-.game{display:grid;grid-template-rows:auto auto 1fr auto;gap:8px;height:100%;padding:10px;overflow:hidden}
+.game{display:grid;grid-template-rows:auto auto 1fr;gap:8px;height:100%;padding:10px;overflow:hidden;user-select:none}
 .panel{border:3px solid #1c1c24;border-radius:6px;box-shadow:inset 0 0 0 2px #fbf8ec,inset 0 0 0 4px #9aa6c0,0 3px #0d111c;background:#fbf8ec}
-.topbar{display:flex;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap}
-.logo{font-size:13px;letter-spacing:1px;color:#e8353b;text-shadow:2px 2px 0 #1c1c24}
+.topbar{display:flex;align-items:center;gap:12px;padding:10px 14px;flex-wrap:wrap}
+.logo{font-size:14px;letter-spacing:1px;color:#e8353b;text-shadow:2px 2px 0 #1c1c24}
 .logo span{margin-left:6px;color:#ffd34d}
-.stats{margin-left:auto;display:flex;gap:12px;font-size:7px;color:#4a4a58;flex-wrap:wrap}
+.stats{margin-left:auto;display:flex;gap:14px;font-size:8px;color:#4a4a58;flex-wrap:wrap}
 .stats b{color:#1c1c24;margin-left:4px}
-.searchbar{display:flex;gap:8px;padding:10px;flex-wrap:wrap;align-items:center}
-.searchbar input{flex:1;min-width:160px;padding:10px;border:3px solid #1c1c24;background:#fffdf5;font:inherit;font-size:9px}
-button{padding:10px 12px;border:3px solid #1c1c24;background:#ffd34d;font:inherit;font-size:9px;cursor:pointer;color:#1c1c24}
-button:active{transform:translate(1px,1px)}
+.searchbar{display:flex;gap:8px;padding:10px;flex-wrap:wrap;align-items:center;background:#2b3350;box-shadow:inset 0 0 0 2px #56628c,0 3px #0d111c;border:3px solid #1c1c24;border-radius:6px}
+.searchbar input{flex:1;min-width:160px;padding:10px;border:0;background:transparent;color:#fbf8ec;font:inherit;font-size:9px;text-transform:uppercase;outline:none}
+.searchbar input::placeholder{color:#7f8bb2}
+button{padding:8px 10px;border:2px solid #1c1c24;border-radius:4px;background:#ffd34d;font:inherit;font-size:9px;cursor:pointer;box-shadow:0 2px #1c1c24;color:#1c1c24}
+button:active{transform:translateY(2px);box-shadow:none}
 button.ghost{background:#e7e3d4}
-.stage{display:grid;grid-template-columns:280px 1fr;gap:8px;min-height:0}
+button.go{background:#9ff6ff}
+.stage{display:grid;grid-template-columns:260px 1fr;gap:8px;min-height:0}
 @media(max-width:900px){.stage{grid-template-columns:1fr}}
 .col{min-height:0;display:flex;flex-direction:column;gap:8px}
-.hits{overflow:auto;padding:8px;flex:1;min-height:120px}
-.hit{padding:8px;margin-bottom:6px;border:2px solid #1c1c24;background:#fffdf5;cursor:pointer;font-size:7px;line-height:1.45;color:#4a4a58}
+.hits{overflow:auto;padding:8px;flex:1;min-height:100px}
+.hit{padding:8px;margin-bottom:6px;border:2px solid #1c1c24;border-radius:4px;background:#fffdf5;cursor:pointer;font-size:7px;line-height:1.45;color:#4a4a58}
 .hit:hover,.hit.active{background:#ffe9a8}
 .hit strong{color:#1c1c24;display:block;margin-bottom:4px;font-size:8px}
-.world-wrap{position:relative;flex:1;min-height:320px;background:#2f3a55;border:3px solid #1c1c24;overflow:hidden}
+.world-wrap{position:relative;flex:1;min-height:340px;background:#cfe4ec;border:3px solid #1c1c24;border-radius:6px;overflow:hidden;box-shadow:inset 0 0 0 2px #fbf8ec,inset 0 0 0 4px #9aa6c0,0 3px #0d111c}
 canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
-.hud{position:absolute;left:8px;right:8px;top:8px;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
-.chip{background:rgba(251,248,236,.92);border:2px solid #1c1c24;padding:6px 8px;font-size:7px;line-height:1.4}
-.chip.ok{background:#b8f2c8}.chip.bad{background:#ffb3b8}.chip.hot{background:#ffe9a8}
-.bar{height:8px;background:#1c1c24;border:2px solid #1c1c24;margin-top:4px}
-.bar>i{display:block;height:100%;background:#ffd34d;width:0%}
-.dialogue{padding:10px 12px;font-size:8px;line-height:1.5;color:#1c1c24}
+.hud{position:absolute;left:10px;right:10px;top:10px;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none;z-index:2}
+.chip{background:#141826b8;border:2px solid #1c1c24;border-radius:4px;padding:6px 8px;font-size:7px;color:#fbf8ec}
+.chip.ok{background:#2f9e5acc}.chip.bad{background:#e84838cc}.chip.hot{background:#b07a00cc}
+.feverbar{position:absolute;left:12%;right:12%;bottom:12px;height:12px;border:2px solid #1c1c24;border-radius:3px;background:#3a3a48;overflow:hidden;z-index:2}
+.feverbar>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#0b8794,#ffd34d,#e8353b)}
+.toast{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:14px;color:#ffd34d;text-shadow:3px 3px 0 #1c1c24;pointer-events:none;opacity:0;z-index:3;transition:opacity .15s}
+.toast.show{opacity:1}
+.dialogue{padding:12px 14px;font-size:9px;line-height:1.7}
 .dialogue .tag{color:#e8353b}
-.hint{font-size:7px;color:#4a4a58;margin-top:4px}
-video{width:100%;max-height:110px;background:#000;border:2px solid #1c1c24}
-.missions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.mission{font-size:7px;padding:4px 6px;border:2px solid #1c1c24;background:#fffdf5}
-.mission.done{background:#b8f2c8;text-decoration:line-through}
+.hint{font-size:7px;color:#6a6a78;margin-top:6px}
+video{width:100%;max-height:96px;background:#11141c;border:2px solid #1c1c24;border-radius:3px}
+.missions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.mission{font-size:7px;padding:6px;border:2px solid #1c1c24;border-radius:3px;background:#e7e3d4;line-height:1.35}
+.mission.done{background:#b8f0c4}
+.mission .n{color:#0b8794}
+.stars{color:#ffd34d;font-size:12px;margin-top:6px;letter-spacing:2px}
+.legend{position:absolute;left:10px;bottom:28px;display:flex;gap:10px;padding:6px 8px;font-size:6px;color:#fbf8ec;background:#141826b8;border:2px solid #1c1c24;border-radius:4px;z-index:2;pointer-events:none}
+.legend i{display:inline-block;width:8px;height:8px;border:2px solid #1c1c24;margin-right:4px;vertical-align:middle}
 </style>
 </head>
 <body>
 <div class="game">
   <div class="panel topbar">
-    <div class="logo">ROADPLAY <span>VIDEO→PIXEL</span></div>
+    <div class="logo">ROADPLAY <span>CARTOON ROAD</span></div>
     <div class="stats">
       <div>SCORE<b id="score">0</b></div>
       <div>COMBO<b id="combo">0</b></div>
-      <div>LIVES<b id="lives">3</b></div>
-      <div>TAGS<b id="tags">0</b></div>
+      <div>LIVES<b id="lives">5</b></div>
+      <div>STARS<b id="stars">0</b></div>
     </div>
   </div>
-  <div class="panel searchbar">
-    <input id="q" maxlength="240" placeholder="busy crosswalk with cars and people"/>
+  <div class="searchbar">
+    <span style="color:#ffd34d;font-size:10px">›</span>
+    <input id="q" maxlength="240" placeholder="find a busy street with cars and people"/>
     <button id="searchBtn" type="button">SEARCH</button>
-    <button class="ghost" id="demoBtn" type="button">DEMO</button>
-    <button class="ghost" id="playBtn" type="button">PLAY LEVEL</button>
+    <button class="ghost" id="demoBtn" type="button">LUCKY</button>
+    <button class="go" id="playBtn" type="button">GO</button>
   </div>
   <div class="stage">
     <div class="panel col">
-      <div class="hits" id="hits"><div class="hit">Search → pick a real clip → it becomes the pixel world.</div></div>
+      <div class="hits" id="hits"><div class="hit">Search a real clip — we rebuild it as a Link Road–style cartoon stage.</div></div>
       <video id="vid" playsinline muted></video>
     </div>
     <div class="col">
       <div class="world-wrap">
         <canvas id="cv"></canvas>
         <div class="hud">
-          <div class="chip" id="syncChip">SYNC --</div>
-          <div class="chip" id="modeChip">PIXEL CAM</div>
-          <div class="chip hot" id="missionChip">MISSION: SEARCH</div>
+          <div class="chip" id="syncChip">READY</div>
+          <div class="chip hot" id="powerChip">POWER NONE</div>
+          <div class="chip" id="missionChip">FIND A CLIP</div>
         </div>
+        <div class="legend"><span><i style="background:#3ff2ff"></i>YOU</span><span><i style="background:#ffd34d"></i>STAR</span><span><i style="background:#e8353b"></i>HAZARD</span></div>
+        <div class="feverbar"><i id="feverFill"></i></div>
+        <div class="toast" id="toast"></div>
       </div>
       <div class="panel dialogue">
         <div><span class="tag">BRIEF</span> <span id="brief">Awaiting mission…</span></div>
         <div class="missions" id="missions"></div>
-        <div class="hint">World = pixelized video + live YOLO tracks. Arrows/WASD move hero · SPACE tag · P possess nearest car/ped · R restart</div>
-        <div class="bar"><i id="prog"></i></div>
+        <div class="stars" id="starRate"></div>
+        <div class="hint">WASD move · SPACE tag · P possess · F fever · R retry · real clip clocks the movers</div>
       </div>
     </div>
   </div>
@@ -459,342 +521,452 @@ video{width:100%;max-height:110px;background:#000;border:2px solid #1c1c24}
 <script>
 const BASE = (window.location.pathname.match(/^\/app\/roadplay(?=\/|$)/) || [""])[0];
 const api = (p) => `${BASE}/${p.replace(/^\//,"")}`;
-const hitsEl = document.getElementById("hits");
-const qEl = document.getElementById("q");
-const vid = document.getElementById("vid");
-const briefEl = document.getElementById("brief");
-const missionsEl = document.getElementById("missions");
-const scoreEl = document.getElementById("score");
-const comboEl = document.getElementById("combo");
-const livesEl = document.getElementById("lives");
-const tagsEl = document.getElementById("tags");
-const syncChip = document.getElementById("syncChip");
-const modeChip = document.getElementById("modeChip");
-const missionChip = document.getElementById("missionChip");
-const prog = document.getElementById("prog");
-const cv = document.getElementById("cv");
-const ctx = cv.getContext("2d");
-const px = document.createElement("canvas");
-const pctx = px.getContext("2d");
-px.width = 96; px.height = 54;
+const $ = (id) => document.getElementById(id);
+const hitsEl=$("hits"), qEl=$("q"), vid=$("vid"), briefEl=$("brief"), missionsEl=$("missions");
+const scoreEl=$("score"), comboEl=$("combo"), livesEl=$("lives"), starsEl=$("stars");
+const syncChip=$("syncChip"), powerChip=$("powerChip"), missionChip=$("missionChip");
+const feverFill=$("feverFill"), toastEl=$("toast"), starRate=$("starRate");
+const cv=$("cv"), ctx=cv.getContext("2d");
 
-let results = [], selected = null, world = null, samples = [];
-let score = 0, combo = 0, lives = 3, tags = 0;
-let missionProg = {};
-let taggedIds = new Set();
-let keys = {};
-let hero = {x:0.5, y:0.78, possess:null};
-let flash = 0, hurtCd = 0, win = false, fail = false;
-let lastTagAt = 0;
+let results=[], world=null, samples=[];
+let score=0, combo=0, lives=5, starCount=0, fever=0, maxCombo=0;
+let missionProg={}, taggedIds=new Set(), popped=new Set();
+let keys={}, hero={x:.5,y:.86,vx:0,vy:0,possess:null};
+let particles=[], floats=[], clouds=[];
+let power=null, powerT=0, shake=0, flash=0, hurtCd=0;
+let win=false, fail=false, lastTagAt=0, tAnim=0;
+let smoothActors=new Map();
+let dashOffset=0;
+
+// Link Road palette
+const C = {
+  skyTop:"#6fb3e8", skyBot:"#cfe4ec", grass:"#6aa84f", grassDark:"#629f48",
+  road:"#4a4e56", roadMid:"#5a5e66", roadEdge:"#43474f",
+  line:"#f2f2ec", yellow:"#f3c331", curb:"#c9c6bc",
+  build:"#aeb5bd", buildDark:"#1f2b38", ink:"#1c1c24", cream:"#fbf8ec",
+  red:"#e8353b", cyan:"#3ff2ff", teal:"#0b8794", amber:"#ffd34d"
+};
+const PAL = {car:"#9ad7ff",truck:"#ff7ad9",bus:"#58d068",ped:"#ffd34d",bike:"#3ff2ff",light:"#e8353b",hero:"#3ff2ff",prop:"#ffae1a",sign:"#ff3b30",animal:"#ffae1a"};
 
 function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
-function resize(){
-  const r = cv.parentElement.getBoundingClientRect();
-  cv.width = Math.max(320, Math.floor(r.width));
-  cv.height = Math.max(240, Math.floor(r.height));
+function toast(msg,ms=900){ toastEl.textContent=msg; toastEl.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>toastEl.classList.remove("show"),ms); }
+function beep(freq=520,dur=0.05,type="square",vol=0.03){
+  try{ const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return; if(!beep.ac) beep.ac=new AC();
+    const o=beep.ac.createOscillator(), g=beep.ac.createGain(); o.type=type; o.frequency.value=freq; g.gain.value=vol;
+    o.connect(g); g.connect(beep.ac.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, beep.ac.currentTime+dur); o.stop(beep.ac.currentTime+dur);
+  }catch(e){}
 }
+function resize(){ const r=cv.parentElement.getBoundingClientRect(); cv.width=Math.max(360,Math.floor(r.width)); cv.height=Math.max(260,Math.floor(r.height)); }
 window.addEventListener("resize", resize); resize();
+for(let i=0;i<6;i++) clouds.push({x:Math.random(), y:0.06+Math.random()*0.16, s:0.08+Math.random()*0.1, v:0.00015+Math.random()*0.00025});
 
-document.addEventListener("keydown", e => {
-  const k = e.key.toLowerCase();
-  keys[k] = true;
-  if (["arrowup","arrowdown","arrowleft","arrowright"," ","p","r"].includes(k) || e.code==="Space") e.preventDefault();
-  if (k==="r") restartLevel();
+document.addEventListener("keydown", e=>{
+  const k=e.key.toLowerCase(); keys[k]=true;
+  if(["arrowup","arrowdown","arrowleft","arrowright"," ","p","r","f"].includes(k)||e.code==="Space") e.preventDefault();
+  if(k==="r") restartLevel();
+  if(k==="f") triggerFever();
 });
-document.addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
+document.addEventListener("keyup", e=> keys[e.key.toLowerCase()]=false);
 
 async function search(query){
-  hitsEl.innerHTML = '<div class="hit">SEARCHING ARCHIVE…</div>';
-  const res = await fetch(api("api/search"), {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({query})});
-  const data = await res.json();
-  if(!res.ok) throw new Error(data.error||"search failed");
-  results = data.results||[];
-  if(!results.length){ hitsEl.innerHTML = '<div class="hit">NO HITS. TRY ANOTHER QUERY.</div>'; return; }
-  hitsEl.innerHTML = results.map((r,i)=>`
-    <div class="hit" data-i="${i}">
-      <strong>${esc(r.camera_id)} · ${esc(r.location)} · ${(r.similarity_score||0).toFixed(2)}</strong>
-      ${esc((r.reasoning_content||"").slice(0,140))}
-    </div>`).join("");
-  hitsEl.querySelectorAll(".hit").forEach(el => el.addEventListener("click", () => pick(+el.dataset.i)));
+  hitsEl.innerHTML='<div class="hit">SEARCHING…</div>';
+  const res=await fetch(api("api/search"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query})});
+  const data=await res.json(); if(!res.ok) throw new Error(data.error||"search failed");
+  results=data.results||[];
+  if(!results.length){ hitsEl.innerHTML='<div class="hit">NO HITS. TRY LUCKY.</div>'; return; }
+  hitsEl.innerHTML=results.map((r,i)=>`<div class="hit" data-i="${i}"><strong>${esc(r.camera_id)} · ${esc(r.location)} · ${(r.similarity_score||0).toFixed(2)}</strong>${esc((r.reasoning_content||"").slice(0,130))}</div>`).join("");
+  hitsEl.querySelectorAll(".hit").forEach(el=>el.addEventListener("click",()=>pick(+el.dataset.i)));
   pick(0);
 }
 
 async function pick(i){
-  selected = results[i];
-  hitsEl.querySelectorAll(".hit").forEach((el,idx)=>el.classList.toggle("active", idx===i));
-  missionChip.textContent = "LOADING PIXEL WORLD…";
-  const res = await fetch(api("api/world"), {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({hit:selected})});
-  const data = await res.json();
-  if(!res.ok){ briefEl.textContent = data.error||"WORLD FAILED"; return; }
-  world = data;
-  samples = (data.timeline && data.timeline.samples) || [];
-  briefEl.textContent = data.brief;
-  if(data.stream_path){
-    vid.src = api(data.stream_path);
-    vid.load();
-  }
-  resetGame();
-  renderMissions();
-  const n = data.timeline?.detection_count || 0;
-  const fb = data.timeline?.fallback ? " (fallback)" : "";
-  missionChip.textContent = `TRACKS ${n}${fb}`;
-  modeChip.textContent = data.timeline?.fallback ? "CLASS FALLBACK" : "PIXEL CAM + YOLO";
+  hitsEl.querySelectorAll(".hit").forEach((el,idx)=>el.classList.toggle("active",idx===i));
+  missionChip.textContent="BUILDING ROAD…";
+  const res=await fetch(api("api/world"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({hit:results[i]})});
+  const data=await res.json(); if(!res.ok){ briefEl.textContent=data.error||"fail"; return; }
+  world=data; samples=(data.timeline&&data.timeline.samples)||[];
+  briefEl.textContent=data.brief;
+  if(data.stream_path){ vid.src=api(data.stream_path); vid.load(); }
+  resetGame(); renderMissions();
+  missionChip.textContent=`CARTOON · ${data.timeline?.detection_count||0} TRACKS`;
+  toast("ROAD READY",1000); beep(660,.08);
 }
 
 function resetGame(){
-  score=0; combo=0; lives=3; tags=0; win=false; fail=false; flash=0; hurtCd=0;
-  taggedIds = new Set();
-  missionProg = {};
-  (world?.timeline?.missions||[]).forEach(m => missionProg[m.id]=0);
-  hero = {x:0.5, y:0.82, possess:null};
-  scoreEl.textContent="0"; comboEl.textContent="0"; livesEl.textContent="3"; tagsEl.textContent="0";
-  prog.style.width="0%";
+  score=0; combo=0; lives=5; starCount=0; fever=0; maxCombo=0;
+  missionProg={}; (world?.timeline?.missions||[]).forEach(m=>missionProg[m.id]=0);
+  taggedIds=new Set(); popped=new Set(); particles=[]; floats=[];
+  power=null; powerT=0; shake=0; flash=0; hurtCd=0; win=false; fail=false;
+  hero={x:.5,y:.86,vx:0,vy:0,possess:null}; smoothActors=new Map();
+  scoreEl.textContent="0"; comboEl.textContent="0"; livesEl.textContent="5"; starsEl.textContent="0";
+  feverFill.style.width="0%"; starRate.textContent=""; powerChip.textContent="POWER NONE"; missionChip.className="chip";
 }
-
-function restartLevel(){
-  resetGame();
-  renderMissions();
-  try { vid.currentTime = 0; vid.play(); } catch(e){}
-}
+function restartLevel(){ resetGame(); renderMissions(); try{vid.currentTime=0; vid.playbackRate=1; vid.play();}catch(e){} toast("RETRY",600); }
 
 function renderMissions(){
-  const ms = world?.timeline?.missions || [];
-  missionsEl.innerHTML = ms.map(m=>{
-    const cur = missionProg[m.id]||0;
-    const done = m.kind==="survive" ? win : cur>=m.target;
-    return `<div class="mission ${done?"done":""}">${esc(m.label)} ${m.kind==="survive"?(done?"OK":"…"):`${Math.min(cur,m.target)}/${m.target}`}</div>`;
+  const ms=world?.timeline?.missions||[];
+  missionsEl.innerHTML=ms.map(m=>{
+    const cur=missionProg[m.id]||0;
+    const done=m.kind==="survive"?win:(m.kind==="combo"?maxCombo>=m.target:cur>=m.target);
+    const show=m.kind==="survive"?(done?"CLEAR":"LIVE"):(m.kind==="combo"?`${Math.min(maxCombo,m.target)}/${m.target}`:`${Math.min(cur,m.target)}/${m.target}`);
+    return `<div class="mission ${done?"done":""}"><b>${esc(m.label)}</b><br><span class="n">${show}</span> · ${esc(m.blurb||"")}</div>`;
   }).join("");
 }
 
 function actorsAt(t){
   if(!samples.length) return [];
-  let a = samples[0], b = samples[samples.length-1];
-  for(let i=0;i<samples.length;i++){
-    if(samples[i].t <= t) a = samples[i];
-    if(samples[i].t >= t){ b = samples[i]; break; }
-  }
-  if(a===b || Math.abs(b.t-a.t)<1e-6) return (a.actors||[]).map(x=>({...x}));
-  const u = (t - a.t) / (b.t - a.t);
-  const mapB = new Map((b.actors||[]).map(x=>[x.id,x]));
-  const out = [];
+  let a=samples[0], b=samples[samples.length-1];
+  for(let i=0;i<samples.length;i++){ if(samples[i].t<=t) a=samples[i]; if(samples[i].t>=t){ b=samples[i]; break; } }
+  if(a===b||Math.abs(b.t-a.t)<1e-6) return (a.actors||[]).map(x=>({...x}));
+  const u=(t-a.t)/(b.t-a.t); const s=u*u*(3-2*u);
+  const mapB=new Map((b.actors||[]).map(x=>[x.id,x])); const out=[];
   for(const x of (a.actors||[])){
-    const y = mapB.get(x.id);
+    const y=mapB.get(x.id);
     if(!y){ out.push({...x}); continue; }
-    out.push({
-      ...x,
-      x: x.x + (y.x-x.x)*u,
-      y: x.y + (y.y-x.y)*u,
-      w: x.w + (y.w-x.w)*u,
-      h: x.h + (y.h-x.h)*u,
-    });
+    out.push({...x, x:x.x+(y.x-x.x)*s, y:x.y+(y.y-x.y)*s, w:x.w+(y.w-x.w)*s, h:x.h+(y.h-x.h)*s});
   }
-  for(const y of (b.actors||[])){
-    if(!(a.actors||[]).some(x=>x.id===y.id)) out.push({...y});
-  }
+  for(const y of (b.actors||[])) if(!(a.actors||[]).some(x=>x.id===y.id)) out.push({...y});
   return out;
 }
-
-function drawSprite(kind, x, y, w, h, label, tagged){
-  const W=cv.width, H=cv.height;
-  const px0=x*W, py0=y*H;
-  const sw=Math.max(10, w*W*0.9), sh=Math.max(10, h*H*0.9);
-  if(tagged){ ctx.globalAlpha = 0.45; }
-  if(kind==="hero"){
-    ctx.fillStyle="#e8353b"; ctx.fillRect(px0-sw*0.45,py0-sh*0.3,sw*0.9,sh*0.7);
-    ctx.fillStyle="#ffd34d"; ctx.fillRect(px0-sw*0.28,py0-sh*0.1,sw*0.56,sh*0.25);
-  } else if(kind==="car"||kind==="truck"||kind==="bus"){
-    ctx.fillStyle = kind==="bus"?"#5bc0eb": kind==="truck"?"#9b5de5":"#00bbf9";
-    ctx.fillRect(px0-sw*0.5,py0-sh*0.35,sw,sh*0.7);
-    ctx.fillStyle="#1c1c24"; ctx.fillRect(px0-sw*0.35,py0-sh*0.15,sw*0.7,sh*0.25);
-  } else if(kind==="ped"){
-    ctx.fillStyle="#f15bb5"; ctx.beginPath(); ctx.arc(px0,py0-sh*0.25,Math.max(4,sw*0.22),0,6.3); ctx.fill();
-    ctx.fillRect(px0-sw*0.12,py0-sh*0.05,sw*0.24,sh*0.45);
-  } else if(kind==="bike"){
-    ctx.strokeStyle="#00f5d4"; ctx.lineWidth=3;
-    ctx.beginPath(); ctx.arc(px0-sw*0.25,py0+sh*0.15,sw*0.22,0,6.3); ctx.stroke();
-    ctx.beginPath(); ctx.arc(px0+sw*0.25,py0+sh*0.15,sw*0.22,0,6.3); ctx.stroke();
-  } else if(kind==="light"){
-    ctx.fillStyle="#1c1c24"; ctx.fillRect(px0-4,py0-sh*0.4,8,sh*0.8);
-    ctx.fillStyle="#e8353b"; ctx.beginPath(); ctx.arc(px0,py0-sh*0.2,5,0,6.3); ctx.fill();
-  } else {
-    ctx.fillStyle="#fee440"; ctx.fillRect(px0-sw*0.2,py0-sh*0.2,sw*0.4,sh*0.4);
+function softActors(raw){
+  const next=new Map();
+  for(const a of raw){
+    const prev=smoothActors.get(a.id);
+    if(!prev) next.set(a.id,{...a});
+    else { const k=0.32; next.set(a.id,{...a, x:prev.x+(a.x-prev.x)*k, y:prev.y+(a.y-prev.y)*k, w:prev.w+(a.w-prev.w)*k, h:prev.h+(a.h-prev.h)*k}); }
   }
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = tagged ? "#b8f2c8" : "#fbf8ec";
-  ctx.font = `${Math.max(7, Math.floor(sw*0.18))}px "Press Start 2P"`;
-  ctx.fillText(String(label||kind).slice(0,8), px0-sw*0.45, py0-sh*0.45);
+  smoothActors=next; return [...next.values()];
 }
 
-function drawPixelWorld(actors){
+/** Map detection bbox center into cartoon road perspective (Link Road vibe). */
+function toRoad(nx, ny){
+  const depth = Math.max(0.05, Math.min(0.98, ny)); // farther = higher in frame-ish; use as depth
+  // put nearer objects lower on canvas
+  const z = 0.22 + depth * 0.72;
+  const spread = 0.22 + depth * 0.5;
+  const x = 0.5 + (nx - 0.5) * spread * 1.35;
+  return {x: Math.max(0.06, Math.min(0.94, x)), y: Math.max(0.28, Math.min(0.94, z)), scale: 0.55 + depth * 0.9};
+}
+
+function spawnBurst(x,y,color,n=10){ for(let i=0;i<n;i++) particles.push({x,y,vx:(Math.random()-.5)*.018,vy:(Math.random()-.8)*.02,life:28+Math.random()*18,color,r:2+Math.random()*3}); }
+function floatText(x,y,text,color="#ffd34d"){ floats.push({x,y,text,color,life:40}); }
+
+function drawCartoonStage(W,H){
+  // sky
+  const g=ctx.createLinearGradient(0,0,0,H*0.45);
+  g.addColorStop(0,C.skyTop); g.addColorStop(1,C.skyBot);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  // clouds drifting
+  ctx.fillStyle="rgba(255,255,255,0.85)";
+  for(const cl of clouds){
+    cl.x += cl.v; if(cl.x>1.2) cl.x=-0.2;
+    const cx=cl.x*W, cy=cl.y*H, s=cl.s*W;
+    ctx.beginPath(); ctx.arc(cx,cy,s*0.35,0,6.3); ctx.arc(cx+s*0.3,cy-s*0.1,s*0.28,0,6.3); ctx.arc(cx+s*0.55,cy,s*0.32,0,6.3); ctx.fill();
+  }
+
+  // far hills / buildings silhouette
+  ctx.fillStyle=C.build;
+  for(let i=0;i<14;i++){
+    const bw=W*(0.06+((i*17)%5)*0.015), bh=H*(0.08+((i*29)%6)*0.03);
+    const bx=((i*0.09 + dashOffset*0.0002)%1.1)*W - bw*0.2;
+    ctx.fillRect(bx, H*0.30-bh, bw, bh);
+    ctx.fillStyle=C.buildDark; ctx.fillRect(bx+4, H*0.30-bh+6, Math.max(3,bw*0.25), Math.max(4,bh*0.35));
+    ctx.fillStyle=C.build;
+  }
+
+  // grass bands
+  ctx.fillStyle=C.grass; ctx.fillRect(0,H*0.32,W,H*0.68);
+  ctx.fillStyle=C.grassDark;
+  for(let i=0;i<20;i++){ ctx.fillRect((i*47 + dashOffset*0.4)%W, H*0.34+(i%5)*H*0.1, 18, 6); }
+
+  // road trapezoid (perspective)
+  const topY=H*0.36, botY=H;
+  const topL=W*0.38, topR=W*0.62, botL=W*0.05, botR=W*0.95;
+  ctx.fillStyle=C.road;
+  ctx.beginPath(); ctx.moveTo(topL,topY); ctx.lineTo(topR,topY); ctx.lineTo(botR,botY); ctx.lineTo(botL,botY); ctx.closePath(); ctx.fill();
+
+  // road edges
+  ctx.strokeStyle=C.yellow; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.moveTo(topL,topY); ctx.lineTo(botL,botY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(topR,topY); ctx.lineTo(botR,botY); ctx.stroke();
+
+  // flowing lane dashes
+  dashOffset = (dashOffset + 2.2) % 40;
+  ctx.strokeStyle=C.line; ctx.lineWidth=3; ctx.setLineDash([16,18]); ctx.lineDashOffset=-dashOffset;
+  for(const t of [0.33,0.5,0.67]){
+    const x0=topL+(topR-topL)*t, x1=botL+(botR-botL)*t;
+    ctx.beginPath(); ctx.moveTo(x0,topY+8); ctx.lineTo(x1,botY); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // curb strips
+  ctx.fillStyle=C.curb;
+  ctx.fillRect(0, H*0.32, W, 4);
+
+  // trees along sides (simple Link-ish blobs)
+  for(let i=0;i<8;i++){
+    const side = i%2===0?-1:1;
+    const depth = 0.4 + (i%4)*0.12;
+    const x = side<0 ? W*(0.08+depth*0.12) : W*(0.92-depth*0.12);
+    const y = H*(0.4 + depth*0.45);
+    const s = 10 + depth*22;
+    ctx.fillStyle=C.ink; ctx.fillRect(x-3, y, 6, s*0.8);
+    ctx.fillStyle=C.grassDark; ctx.beginPath(); ctx.arc(x,y,s*0.7,0,6.3); ctx.fill();
+    ctx.fillStyle=C.grass; ctx.beginPath(); ctx.arc(x-s*0.25,y-s*0.1,s*0.45,0,6.3); ctx.arc(x+s*0.2,y-s*0.15,s*0.4,0,6.3); ctx.fill();
+  }
+}
+
+function drawActor(a, road){
+  const W=cv.width, H=cv.height;
+  const bob=Math.sin(tAnim*0.15 + a.x*30)*2;
+  const px=road.x*W, py=road.y*H+bob;
+  const s=Math.min(W,H)*0.045*road.scale;
+  const tagged=taggedIds.has(a.id);
+  const col=PAL[a.kind]||PAL.prop;
+  ctx.save();
+  if(tagged) ctx.globalAlpha=0.35;
+  // shadow
+  ctx.fillStyle="rgba(24,25,29,0.35)";
+  ctx.beginPath(); ctx.ellipse(px, py+s*0.55, s*0.55, s*0.18, 0,0,6.3); ctx.fill();
+
+  if(a.kind==="ped"||a.kind==="animal"){
+    ctx.fillStyle=col;
+    ctx.fillRect(px-s*0.25, py-s*0.1, s*0.5, s*0.7);
+    ctx.beginPath(); ctx.arc(px, py-s*0.25, s*0.28,0,6.3); ctx.fill();
+    ctx.fillStyle=C.cream; ctx.fillRect(px-s*0.12, py-s*0.3, s*0.08, s*0.08); ctx.fillRect(px+s*0.04, py-s*0.3, s*0.08, s*0.08);
+  } else if(a.kind==="bike"){
+    ctx.strokeStyle=col; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(px-s*0.35,py+s*0.25,s*0.28,0,6.3); ctx.stroke();
+    ctx.beginPath(); ctx.arc(px+s*0.35,py+s*0.25,s*0.28,0,6.3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px-s*0.2,py+s*0.2); ctx.lineTo(px,py-s*0.25); ctx.lineTo(px+s*0.3,py+s*0.2); ctx.stroke();
+  } else if(a.kind==="light"){
+    ctx.fillStyle=C.ink; ctx.fillRect(px-3, py-s, 6, s*1.2);
+    ctx.fillStyle=C.red; ctx.beginPath(); ctx.arc(px, py-s*0.7, 5,0,6.3); ctx.fill();
+    ctx.fillStyle=C.yellow; ctx.beginPath(); ctx.arc(px, py-s*0.35, 4,0,6.3); ctx.fill();
+  } else {
+    // blocky car / truck / bus — Link Road chunky
+    const bodyH = a.kind==="truck"||a.kind==="bus" ? s*0.85 : s*0.65;
+    const bodyW = a.kind==="bus" ? s*1.5 : s*1.15;
+    ctx.fillStyle=C.ink;
+    ctx.fillRect(px-bodyW*0.5-2, py-bodyH*0.5-2, bodyW+4, bodyH+4);
+    ctx.fillStyle=col;
+    ctx.fillRect(px-bodyW*0.5, py-bodyH*0.5, bodyW, bodyH);
+    ctx.fillStyle=C.buildDark;
+    ctx.fillRect(px-bodyW*0.32, py-bodyH*0.35, bodyW*0.64, bodyH*0.35);
+    ctx.fillStyle=C.cream;
+    ctx.fillRect(px-bodyW*0.22, py-bodyH*0.25, 4, 4);
+    ctx.fillRect(px+bodyW*0.1, py-bodyH*0.25, 4, 4);
+    if(a.hazard){ ctx.strokeStyle=C.red; ctx.lineWidth=2; ctx.strokeRect(px-bodyW*0.55, py-bodyH*0.6, bodyW*1.1, bodyH*1.2); }
+  }
+  if(a.star && !tagged){
+    ctx.fillStyle=C.amber;
+    ctx.font=`${Math.max(9,s*0.45)}px Press Start 2P`;
+    ctx.fillText("★", px-6, py-s*0.85 + Math.sin(tAnim*0.2)*2);
+  }
+  ctx.fillStyle=C.cream;
+  ctx.font=`${Math.max(7,Math.floor(s*0.28))}px Press Start 2P`;
+  ctx.fillText(String(a.label||a.kind).slice(0,6), px-s*0.6, py-s*0.95);
+  ctx.restore();
+}
+
+function drawHero(road){
+  const W=cv.width,H=cv.height, px=road.x*W, py=road.y*H, s=Math.min(W,H)*0.05*road.scale;
+  ctx.fillStyle="rgba(63,242,255,0.25)"; ctx.beginPath(); ctx.arc(px,py,s*1.1,0,6.3); ctx.fill();
+  ctx.fillStyle=C.ink; ctx.fillRect(px-s*0.55, py-s*0.35, s*1.1, s*0.75);
+  ctx.fillStyle=C.cyan; ctx.fillRect(px-s*0.5, py-s*0.3, s, s*0.65);
+  ctx.fillStyle=C.amber; ctx.fillRect(px-s*0.28, py-s*0.12, s*0.56, s*0.22);
+  ctx.fillStyle=C.cream; ctx.font=`${Math.max(7,s*0.28)}px Press Start 2P`; ctx.fillText("YOU", px-s*0.45, py-s*0.5);
+}
+
+function drawWorld(actors){
   resize();
   const W=cv.width, H=cv.height;
-  ctx.imageSmoothingEnabled = false;
+  ctx.save();
+  if(shake>0){ ctx.translate((Math.random()-.5)*shake*5,(Math.random()-.5)*shake*5); shake*=0.85; }
+  ctx.imageSmoothingEnabled=false;
+  drawCartoonStage(W,H);
 
-  // Video → simplified pixel backdrop
-  if(vid.readyState >= 2){
-    pctx.imageSmoothingEnabled = false;
-    pctx.drawImage(vid, 0, 0, px.width, px.height);
-    // posterize-ish palette punch
-    const img = pctx.getImageData(0,0,px.width,px.height);
-    const d = img.data;
-    for(let i=0;i<d.length;i+=4){
-      d[i]   = (d[i]>>5)<<5;
-      d[i+1] = (d[i+1]>>5)<<5;
-      d[i+2] = (d[i+2]>>5)<<5;
-    }
-    pctx.putImageData(img,0,0);
-    ctx.drawImage(px, 0, 0, W, H);
-  } else {
-    ctx.fillStyle = "#6ec6ff"; ctx.fillRect(0,0,W,H*0.35);
-    ctx.fillStyle = "#3d3d48"; ctx.fillRect(0,H*0.35,W,H*0.65);
-  }
+  // sort far→near for draw order
+  const mapped=actors.map(a=>{
+    const r=toRoad(a.x,a.y);
+    return {a,r};
+  }).sort((u,v)=>u.r.y-v.r.y);
 
-  // dim overlay so sprites pop
-  ctx.fillStyle = "rgba(27,33,51,0.22)";
-  ctx.fillRect(0,0,W,H);
+  for(const {a,r} of mapped) drawActor(a,r);
 
-  // scanlines
-  ctx.fillStyle="rgba(0,0,0,0.12)";
-  for(let y=0;y<H;y+=3) ctx.fillRect(0,y,W,1);
-
-  for(const a of actors){
-    drawSprite(a.kind, a.x, a.y, a.w, a.h, a.label, taggedIds.has(a.id));
-  }
-
-  // hero / possessed
   if(hero.possess){
-    const p = actors.find(a=>a.id===hero.possess);
-    if(p){
-      hero.x = p.x; hero.y = p.y;
-      ctx.strokeStyle="#ffd34d"; ctx.lineWidth=3;
-      ctx.strokeRect(p.x*W-p.w*W*0.55, p.y*H-p.h*H*0.45, p.w*W*1.1, p.h*H*0.95);
-    } else {
-      hero.possess = null;
-    }
+    const p=actors.find(x=>x.id===hero.possess);
+    if(p){ const r=toRoad(p.x,p.y); hero.x=r.x; hero.y=r.y; ctx.strokeStyle=C.amber; ctx.lineWidth=3; ctx.strokeRect(r.x*W-20*r.scale, r.y*H-24*r.scale, 40*r.scale, 36*r.scale); }
+    else hero.possess=null;
   }
-  if(!hero.possess){
-    drawSprite("hero", hero.x, hero.y, 0.06, 0.08, "YOU", false);
-  }
+  if(!hero.possess) drawHero({x:hero.x,y:hero.y,scale:1.15});
 
-  if(flash>0){ ctx.fillStyle=`rgba(255,211,77,${flash})`; ctx.fillRect(0,0,W,H); flash*=0.85; }
-  if(win){ ctx.fillStyle="rgba(184,242,200,0.35)"; ctx.fillRect(0,0,W,H); ctx.fillStyle="#1c1c24"; ctx.font="14px Press Start 2P"; ctx.fillText("LEVEL CLEAR", W*0.28, H*0.5); }
-  if(fail){ ctx.fillStyle="rgba(232,53,59,0.35)"; ctx.fillRect(0,0,W,H); ctx.fillStyle="#fbf8ec"; ctx.font="14px Press Start 2P"; ctx.fillText("GAME OVER", W*0.3, H*0.5); }
+  for(const p of particles){
+    ctx.globalAlpha=Math.max(0,p.life/40); ctx.fillStyle=p.color;
+    ctx.fillRect(p.x*W, p.y*H, p.r, p.r);
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.0007; p.life--;
+  }
+  particles=particles.filter(p=>p.life>0); ctx.globalAlpha=1;
+  for(const f of floats){
+    ctx.globalAlpha=f.life/40; ctx.fillStyle=f.color;
+    ctx.font="9px Press Start 2P"; ctx.fillText(f.text, f.x*W, f.y*H-(40-f.life));
+    f.life--;
+  }
+  floats=floats.filter(f=>f.life>0); ctx.globalAlpha=1;
+
+  if(flash>0){ ctx.fillStyle=`rgba(255,211,77,${flash})`; ctx.fillRect(0,0,W,H); flash*=0.88; }
+  if(power==="slow"){ ctx.fillStyle="rgba(11,135,148,0.12)"; ctx.fillRect(0,0,W,H); }
+  if(power==="shield"){ ctx.strokeStyle="#58d068"; ctx.lineWidth=4; ctx.strokeRect(4,4,W-8,H-8); }
+
+  if(win){ ctx.fillStyle="rgba(47,158,90,0.3)"; ctx.fillRect(0,0,W,H); ctx.fillStyle=C.cream; ctx.font="16px Press Start 2P"; ctx.fillText("STREET CLEARED", W*0.22, H*0.48); }
+  if(fail){ ctx.fillStyle="rgba(232,72,56,0.35)"; ctx.fillRect(0,0,W,H); ctx.fillStyle=C.cream; ctx.font="16px Press Start 2P"; ctx.fillText("SPLAT — R RETRY", W*0.2, H*0.5); }
+  ctx.restore();
 }
 
 function bumpMission(kind){
-  const ms = world?.timeline?.missions || [];
+  const ms=world?.timeline?.missions||[];
   for(const m of ms){
-    if(m.kind==="survive") continue;
-    if(m.kind==="any" || m.kind===kind || (m.kind==="car" && (kind==="car"||kind==="truck"||kind==="bus"))){
-      missionProg[m.id] = (missionProg[m.id]||0) + 1;
+    if(m.kind==="survive"||m.kind==="combo") continue;
+    if(m.kind==="any"||m.kind===kind||(m.kind==="car"&&(kind==="car"||kind==="truck"||kind==="bus"))){
+      const before=missionProg[m.id]||0; missionProg[m.id]=before+1;
+      if(before<m.target && missionProg[m.id]>=m.target){ score+=m.reward||200; floatText(hero.x,hero.y-0.06,`+${m.reward}`,C.teal); toast(`${m.label}`,900); beep(880,.1,"triangle"); spawnBurst(hero.x,hero.y,C.teal,14); }
     }
   }
-  renderMissions();
-  checkWin();
+  if(maxCombo>=5){ const m=ms.find(x=>x.kind==="combo"); if(m && (missionProg.fever||0)<m.target){ missionProg.fever=m.target; score+=m.reward||500; toast("FEVER MISSION",1000); } }
+  scoreEl.textContent=score; renderMissions(); checkWin();
 }
-
 function checkWin(){
-  const ms = world?.timeline?.missions || [];
-  const tagsDone = ms.filter(m=>m.kind!=="survive").every(m => (missionProg[m.id]||0) >= m.target);
+  const ms=world?.timeline?.missions||[];
+  const need=ms.filter(m=>m.kind!=="survive");
+  const tagsDone=need.every(m=> m.kind==="combo" ? maxCombo>=m.target : (missionProg[m.id]||0)>=m.target);
   if(tagsDone && !win && !fail){
-    win = true;
-    missionProg.survive = 1;
-    score += 500 + combo*50;
-    scoreEl.textContent = score;
-    renderMissions();
-    missionChip.textContent = "LEVEL CLEAR";
-    missionChip.className = "chip ok";
+    win=true; missionProg.survive=1;
+    score+=800+combo*40+starCount*60; scoreEl.textContent=score;
+    const stars=score>2500?3:score>1400?2:1;
+    starRate.textContent="★".repeat(stars)+"☆".repeat(3-stars)+`  ${score}`;
+    missionChip.textContent="CLEARED"; missionChip.className="chip ok"; renderMissions();
+    toast("STREET CLEARED",1500); beep(523,.08); setTimeout(()=>beep(659,.08),80); setTimeout(()=>beep(784,.12),160);
+    spawnBurst(.5,.5,C.amber,36); try{vid.pause();}catch(e){}
   }
+}
+function grantPower(name){
+  power=name; powerT=240; powerChip.textContent=`POWER ${name.toUpperCase()}`; powerChip.className="chip ok";
+  toast(name.toUpperCase(),700); if(name==="slow"){ try{vid.playbackRate=0.55;}catch(e){} } beep(700,.08,"triangle");
+}
+function triggerFever(){
+  if(fever<80||fail||win) return;
+  fever=Math.max(0,fever-80); feverFill.style.width=fever+"%";
+  grantPower(["magnet","slow","shield","double"][Math.floor(Math.random()*4)]);
+  spawnBurst(hero.x,hero.y,C.red,20); flash=0.4;
 }
 
 function step(){
-  const t = vid.currentTime || 0;
-  const dur = (world?.timeline?.duration) || vid.duration || 1;
-  const actors = actorsAt(t);
-  syncChip.textContent = `T ${t.toFixed(2)} / ${dur.toFixed(1)} · ${actors.length} MOVING`;
-  prog.style.width = `${Math.min(100, (t/Math.max(0.01,dur))*100)}%`;
+  tAnim++;
+  const t=vid.currentTime||0;
+  const dur=(world?.timeline?.duration)||vid.duration||1;
+  let actors=softActors(actorsAt(t));
+  syncChip.textContent=`${t.toFixed(1)}s · ${actors.length} on road`;
 
-  // movement
-  const speed = 0.012;
-  if(!hero.possess){
-    if(keys["arrowleft"]||keys["a"]) hero.x = Math.max(0.05, hero.x-speed);
-    if(keys["arrowright"]||keys["d"]) hero.x = Math.min(0.95, hero.x+speed);
-    if(keys["arrowup"]||keys["w"]) hero.y = Math.max(0.08, hero.y-speed);
-    if(keys["arrowdown"]||keys["s"]) hero.y = Math.min(0.92, hero.y+speed);
+  if(powerT>0){ powerT--; if(powerT<=0){ if(power==="slow"){ try{vid.playbackRate=1;}catch(e){} } power=null; powerChip.textContent="POWER NONE"; powerChip.className="chip"; } }
+
+  const accel=0.0024, friction=0.8, maxv=0.02;
+  if(!hero.possess && !fail && !win){
+    if(keys["arrowleft"]||keys["a"]) hero.vx-=accel;
+    if(keys["arrowright"]||keys["d"]) hero.vx+=accel;
+    if(keys["arrowup"]||keys["w"]) hero.vy-=accel;
+    if(keys["arrowdown"]||keys["s"]) hero.vy+=accel;
+    hero.vx*=friction; hero.vy*=friction;
+    hero.vx=Math.max(-maxv,Math.min(maxv,hero.vx)); hero.vy=Math.max(-maxv,Math.min(maxv,hero.vy));
+    hero.x=Math.max(0.08,Math.min(0.92,hero.x+hero.vx));
+    hero.y=Math.max(0.34,Math.min(0.94,hero.y+hero.vy));
   }
 
-  // possess
+  // magnet pulls road-space
+  if(power==="magnet"){
+    for(const a of actors){
+      if(taggedIds.has(a.id)||!a.playable) continue;
+      const r=toRoad(a.x,a.y);
+      // nudge raw coords toward hero projection inverse-ish
+      a.x += ((hero.x-0.5)/1.2 + 0.5 - a.x)*0.03;
+      a.y += ((hero.y-0.22)/0.72 - a.y)*0.03;
+    }
+  }
+
   if(keys["p"]){
     keys["p"]=false;
-    if(hero.possess){ hero.possess=null; }
+    if(hero.possess){ hero.possess=null; toast("HOP OUT",500); }
     else {
       let best=null, bd=0.12;
       for(const a of actors){
-        if(!a.playable || taggedIds.has(a.id)) continue;
-        const dist = Math.hypot(a.x-hero.x, a.y-hero.y);
-        if(dist<bd){ bd=dist; best=a; }
+        if(!a.playable||taggedIds.has(a.id)) continue;
+        const r=toRoad(a.x,a.y);
+        const d=Math.hypot(r.x-hero.x,r.y-hero.y);
+        if(d<bd){ bd=d; best=a; }
       }
-      if(best){ hero.possess = best.id; score+=25; scoreEl.textContent=score; flash=0.3; }
+      if(best){ hero.possess=best.id; score+=40; scoreEl.textContent=score; floatText(hero.x,hero.y,"HOP",C.cyan); beep(440,.05); flash=0.2; }
     }
   }
 
-  // tag
-  if(keys[" "]||keys["space"]){
+  if((keys[" "]||keys["space"]) && !fail && !win){
     keys[" "]=keys["space"]=false;
-    const hx = hero.x, hy = hero.y;
-    let hit=null, bd=0.09;
+    let hit=null, bd=power==="magnet"?0.14:0.1;
     for(const a of actors){
-      if(taggedIds.has(a.id) || a.kind==="light" || a.kind==="sign" || a.kind==="prop") continue;
-      const dist = Math.hypot(a.x-hx, a.y-hy);
-      if(dist<bd){ bd=dist; hit=a; }
+      if(taggedIds.has(a.id)||a.kind==="light"||a.kind==="sign"||a.kind==="prop") continue;
+      const r=toRoad(a.x,a.y);
+      const d=Math.hypot(r.x-hero.x,r.y-hero.y);
+      if(d<bd){ bd=d; hit=a; }
     }
     if(hit){
       taggedIds.add(hit.id);
-      const now = performance.now();
-      combo = (now - lastTagAt < 1800) ? combo+1 : 1;
-      lastTagAt = now;
-      const pts = (hit.hazard?120:70) * Math.max(1, combo);
-      score += pts; tags += 1;
-      scoreEl.textContent=score; comboEl.textContent=combo; tagsEl.textContent=tags;
+      const now=performance.now();
+      combo=(now-lastTagAt<2000)?combo+1:1; lastTagAt=now; maxCombo=Math.max(maxCombo,combo);
+      const mult=(power==="double"?2:1)*Math.max(1,combo);
+      let pts=(hit.hazard?140:80)*mult;
+      if(hit.star){ pts+=90; starCount++; starsEl.textContent=starCount; if(starCount%3===0) grantPower(["magnet","slow","shield","double"][starCount%4]); }
+      score+=pts; fever=Math.min(100,fever+12+combo*2);
+      scoreEl.textContent=score; comboEl.textContent=combo; feverFill.style.width=fever+"%";
+      const rr=toRoad(hit.x,hit.y);
+      floatText(rr.x,rr.y,`+${pts}`, combo>=4?C.red:C.amber);
+      spawnBurst(rr.x,rr.y,PAL[hit.kind]||C.amber,12);
+      beep(520+combo*40,.05);
+      if(combo===5) toast("COMBO x5",800);
+      if(combo===8){ toast("UNSTOPPABLE",800); grantPower("double"); }
       bumpMission(hit.kind);
-      flash=0.4;
       if(hero.possess===hit.id) hero.possess=null;
+      if(fever>=100){ toast("PRESS F",900); missionChip.textContent="FEVER READY"; missionChip.className="chip hot"; }
     }
   }
 
-  // hazard collisions
   if(hurtCd>0) hurtCd--;
-  if(!fail && !win && hurtCd<=0){
+  if(!fail && !win && hurtCd<=0 && power!=="shield"){
     for(const a of actors){
-      if(!a.hazard || taggedIds.has(a.id)) continue;
-      if(Math.hypot(a.x-hero.x, a.y-hero.y) < 0.055){
-        lives = Math.max(0, lives-1);
-        livesEl.textContent = lives;
-        hurtCd = 45;
-        combo = 0; comboEl.textContent="0";
-        flash = 0.5;
-        if(lives<=0){ fail=true; missionChip.textContent="GAME OVER — R TO RETRY"; missionChip.className="chip bad"; try{vid.pause();}catch(e){} }
+      if(!a.hazard||taggedIds.has(a.id)) continue;
+      const r=toRoad(a.x,a.y);
+      if(Math.hypot(r.x-hero.x,r.y-hero.y)<0.055){
+        lives--; livesEl.textContent=lives; hurtCd=50; combo=0; comboEl.textContent="0";
+        fever=Math.max(0,fever-20); feverFill.style.width=fever+"%";
+        shake=1; flash=0.5; spawnBurst(hero.x,hero.y,C.red,16); beep(140,.12,"sawtooth",0.04); toast("OUCH",500);
+        if(lives<=0){ fail=true; missionChip.textContent="SPLAT — R"; missionChip.className="chip bad"; try{vid.pause();}catch(e){} }
         break;
       }
     }
   }
 
-  // auto-complete survive if video ended with lives
   if(!win && !fail && vid.ended && lives>0){
-    const ms = world?.timeline?.missions || [];
-    const tagsDone = ms.filter(m=>m.kind!=="survive").every(m => (missionProg[m.id]||0) >= m.target);
-    if(tagsDone) checkWin();
-    else { missionChip.textContent = "CLIP OVER — FINISH TAGS (R)"; missionChip.className="chip hot"; }
+    const rush=world?.timeline?.missions?.find(m=>m.id==="rush");
+    if(rush && (missionProg.rush||0)>=rush.target) checkWin();
+    else { missionChip.textContent="TIME — FINISH TAGS / R"; missionChip.className="chip hot"; }
   }
 
-  drawPixelWorld(actors);
+  drawWorld(actors);
   requestAnimationFrame(step);
 }
 requestAnimationFrame(step);
 
-document.getElementById("searchBtn").onclick = () => search(qEl.value.trim()||"busy intersection with cars and pedestrians").catch(e=>hitsEl.innerHTML=`<div class="hit">ERROR: ${esc(e.message)}</div>`);
-document.getElementById("demoBtn").onclick = () => { qEl.value="pedestrians and cars at a city crosswalk"; document.getElementById("searchBtn").click(); };
-document.getElementById("playBtn").onclick = () => { restartLevel(); vid.play().catch(()=>{}); };
+$("searchBtn").onclick=()=>search(qEl.value.trim()||"busy intersection with cars and pedestrians").catch(e=>hitsEl.innerHTML=`<div class="hit">ERROR: ${esc(e.message)}</div>`);
+$("demoBtn").onclick=()=>{ qEl.value=["pedestrians and cars at a city crosswalk","motorcycle in traffic near crosswalk","truck and cars at busy intersection"][Math.floor(Math.random()*3)]; $("searchBtn").click(); };
+$("playBtn").onclick=()=>{ restartLevel(); vid.play().catch(()=>{}); toast("GO",600); beep(784,.08); };
 </script>
 </body>
 </html>
